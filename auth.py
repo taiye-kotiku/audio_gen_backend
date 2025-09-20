@@ -1,7 +1,7 @@
 import json
 import bcrypt
 from datetime import datetime, timedelta
-import jwt
+from jose import jwt, JWTError, ExpiredSignatureError   # ✅ use python-jose
 from fastapi import HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 
@@ -12,13 +12,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+
 def load_users():
     with open(USERS_FILE, "r") as f:
         return json.load(f)
 
+
 def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=2)
+
 
 def authenticate_user(email: str, password: str):
     users = load_users()
@@ -27,16 +30,18 @@ def authenticate_user(email: str, password: str):
         return None
     return user
 
+
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "sub": data.get("email")})  # ✅ add sub for identification
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
+        email: str = payload.get("sub")
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
         users = load_users()
@@ -44,10 +49,11 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user
-    except jwt.ExpiredSignatureError:
+    except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except Exception:
+    except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
 
 def get_admin_user(current_user=Depends(get_current_user)):
     if not current_user.get("is_admin"):
