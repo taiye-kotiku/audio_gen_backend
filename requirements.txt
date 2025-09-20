@@ -3,3 +3,8 @@ uvicorn
 requests
 pydub
 python-multipart
+python-dotenv==1.0.1
+bcrypt==4.1.2
+aiohttp==3.9.5
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
