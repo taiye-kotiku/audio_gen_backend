@@ -5,19 +5,31 @@ import subprocess
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
 from auth import authenticate_user, create_access_token, get_admin_user, load_users, save_users
 import bcrypt
+import json
 
 load_dotenv()
 
-
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "sk_a31b9940b467d14ec9114c01e7e73a3c75906e25cd19ba35")
-VOICE_ID = "6sFKzaJr574YWVu4UuJF"
-
 OUTPUT_DIR = "outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+CONFIG_FILE = "config.json"
+
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        return {"ELEVENLABS_API_KEY": ""}
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
+
+def save_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+
+# Load config on startup
+config = load_config()
 
 app = FastAPI()
 
@@ -30,13 +42,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
+
 # Global dictionary to track progress
 progress_dict = {}
 
 
-
+# ------------------ AUTH ------------------
 @app.post("/token")
 async def login(email: str = Form(...), password: str = Form(...)):
     user = authenticate_user(email, password)
@@ -45,13 +57,20 @@ async def login(email: str = Form(...), password: str = Form(...)):
     token = create_access_token({"sub": user["email"]})
     return {"access_token": token, "token_type": "bearer", "is_admin": user["is_admin"]}
 
+
+# ------------------ ADMIN ------------------
 @app.get("/admin/list-users/")
 async def list_users(admin=Depends(get_admin_user)):
     users = load_users()
     return [{"email": u["email"], "is_admin": u["is_admin"]} for u in users]
 
 @app.post("/admin/add-user/")
-async def add_user(email: str = Form(...), password: str = Form(...), is_admin: bool = Form(False), admin=Depends(get_admin_user)):
+async def add_user(
+    email: str = Form(...),
+    password: str = Form(...),
+    is_admin: bool = Form(False),
+    admin=Depends(get_admin_user)
+):
     users = load_users()
     if any(u["email"] == email for u in users):
         raise HTTPException(status_code=400, detail="User already exists")
@@ -67,6 +86,14 @@ async def remove_user(email: str = Form(...), admin=Depends(get_admin_user)):
     save_users(users)
     return JSONResponse({"message": f"User {email} removed successfully"})
 
+@app.post("/admin/set-api-key/")
+async def set_api_key(api_key: str = Form(...), admin=Depends(get_admin_user)):
+    config["ELEVENLABS_API_KEY"] = api_key
+    save_config(config)
+    return {"message": "API key updated successfully"}
+
+
+# ------------------ HELPERS ------------------
 def split_text(text: str, max_length: int = 4500):
     paragraphs = text.split("\n\n")
     chunks, current = [], ""
@@ -94,12 +121,13 @@ def split_text(text: str, max_length: int = 4500):
         chunks.append(current.strip())
     return chunks
 
-# TTS request with retry and progress update
-async def tts_request(session, text, chunk_id, custom_id, retries: int = 3):
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
+
+# ------------------ TTS ------------------
+async def tts_request(session, text, chunk_id, custom_id, voice_id, retries: int = 3):
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {
         "Accept": "audio/mpeg",
-        "xi-api-key": ELEVENLABS_API_KEY,
+        "xi-api-key": config["ELEVENLABS_API_KEY"],
         "Content-Type": "application/json",
     }
     payload = {"text": text, "model_id": "eleven_multilingual_v2"}
@@ -127,7 +155,6 @@ async def tts_request(session, text, chunk_id, custom_id, retries: int = 3):
                 raise HTTPException(status_code=500, detail=f"Chunk {chunk_id} failed: {str(e)}")
             await asyncio.sleep(2 * attempt)
 
-# Merge function
 def merge_audios_ffmpeg(files, output_file):
     file_list_path = os.path.join(OUTPUT_DIR, "file_list.txt")
     with open(file_list_path, "w", encoding="utf-8") as f:
@@ -140,9 +167,14 @@ def merge_audios_ffmpeg(files, output_file):
         text=True
     )
 
-# Generate audio endpoint
+
+# ------------------ ENDPOINTS ------------------
 @app.post("/generate-audio/")
-async def generate_audio(file: UploadFile = File(...), custom_id: str = Form("output")):
+async def generate_audio(
+    file: UploadFile = File(...),
+    custom_id: str = Form("output"),
+    voice_id: str = Form("6sFKzaJr574YWVu4UuJF")   # default voice if user doesn’t provide
+):
     text = (await file.read()).decode("utf-8").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Text file is empty")
@@ -152,18 +184,16 @@ async def generate_audio(file: UploadFile = File(...), custom_id: str = Form("ou
     progress_dict[custom_id] = {"done": 0, "total": total_chunks}
 
     async with aiohttp.ClientSession() as session:
-        tasks = [tts_request(session, chunk, i + 1, custom_id) for i, chunk in enumerate(chunks)]
+        tasks = [tts_request(session, chunk, i + 1, custom_id, voice_id) for i, chunk in enumerate(chunks)]
         audio_files = await asyncio.gather(*tasks)
 
     final_file = os.path.join(OUTPUT_DIR, f"{custom_id}.mp3")
     merge_audios_ffmpeg(audio_files, final_file)
 
-    # Mark progress as complete
     progress_dict[custom_id]["done"] = progress_dict[custom_id]["total"]
 
     return {"message": "Success", "file_path": final_file}
 
-# Progress endpoint
 @app.get("/progress/{custom_id}")
 def get_progress(custom_id: str):
     if custom_id not in progress_dict:
@@ -171,4 +201,3 @@ def get_progress(custom_id: str):
     data = progress_dict[custom_id]
     percent = int((data["done"] / data["total"]) * 100)
     return {"done": data["done"], "total": data["total"], "percent": percent}
-
