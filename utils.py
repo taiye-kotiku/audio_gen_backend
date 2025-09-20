@@ -1,5 +1,20 @@
 from pydub import AudioSegment
 import re
+import json
+import os
+
+CONFIG_FILE = "config.json"
+
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        return {"ELEVENLABS_API_KEY": ""}
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
+
+def save_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+
 
 # Split text into safe chunks (<= 5000 chars, prefer paragraphs)
 def split_text(text, max_length=4900):
