@@ -1,0 +1,12 @@
+{
+  "admin@example.com": [
+    {
+      "custom_id": "slot1_1695800000",
+      "voice_id": "6sFKzaJr574YWVu4UuJF",
+      "timestamp": "2025-09-25 09:30:00",
+      "file_path": "/outputs/slot1_1695800000.mp3",
+      "text_preview": "This is a preview of the text that was converted..."
+    }
+  ],
+  "kotikutaiye@gmail.com": []
+}

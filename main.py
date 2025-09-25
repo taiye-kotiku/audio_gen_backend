@@ -21,6 +21,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 CONFIG_FILE = "config.json"
 
+
 # Track active users
 active_users = {}
 
@@ -88,6 +89,32 @@ async def login(email: str = Form(...), password: str = Form(...)):
         "is_admin": user["is_admin"],
         "voice_id": user.get("voice_id", "6sFKzaJr574YWVu4UuJF")  # 👈 return last voice ID
     }
+
+
+# ------------------ HISTORY ------------------
+HISTORY_FILE = "history.json"
+
+def load_history():
+    if not os.path.exists(HISTORY_FILE):
+        return {}
+    with open(HISTORY_FILE, "r") as f:
+        return json.load(f)
+
+def save_history(history):
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=2)
+
+def add_history_entry(email: str, entry: dict):
+    history = load_history()
+    if email not in history:
+        history[email] = []
+    history[email].append(entry)
+    save_history(history)
+
+@app.get("/history/{email}")
+async def get_history(email: str):
+    history = load_history()
+    return history.get(email, [])
 
 
 # ------------------ ADMIN ------------------
@@ -273,9 +300,17 @@ async def generate_audio(
     merge_audios_ffmpeg(audio_files, final_file, custom_id)
 
     progress_dict[custom_id]["done"] = progress_dict[custom_id]["total"]
+    if email:
+        entry = {
+            "custom_id": custom_id,
+            "voice_id": voice_id,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "file_path": f"/outputs/{custom_id}.mp3",
+            "text_preview": text[:200]  # store first 200 chars
+        }
+        add_history_entry(email, entry)
 
     return {"message": "Success", "file_path": final_file}
-
 
 @app.get("/progress/{custom_id}")
 def get_progress(custom_id: str):
