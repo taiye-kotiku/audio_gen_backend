@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from auth import authenticate_user, create_access_token, get_admin_user, load_users, save_users
 import bcrypt
 import json
+import time
 
 load_dotenv()
 
@@ -19,6 +20,17 @@ OUTPUT_DIR = "outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 CONFIG_FILE = "config.json"
+
+# Track active users
+active_users = {}
+
+def mark_user_active(email: str):
+    active_users[email] = time.time()
+
+def get_active_users(minutes: int = 5):
+    now = time.time()
+    cutoff = now - (minutes * 60)
+    return [u for u, ts in active_users.items() if ts >= cutoff]
 
 def load_config():
     if not os.path.exists(CONFIG_FILE):
@@ -59,8 +71,19 @@ async def login(email: str = Form(...), password: str = Form(...)):
     user = authenticate_user(email, password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
     token = create_access_token({"sub": user["email"]})
-    return {"access_token": token, "token_type": "bearer", "is_admin": user["is_admin"]}
+
+    # mark user active
+    mark_user_active(user["email"])
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "is_admin": user["is_admin"],
+        "voice_id": user.get("voice_id", "6sFKzaJr574YWVu4UuJF")  # 👈 return last voice ID
+    }
+
 
 # ------------------ ADMIN ------------------
 @app.get("/admin/list-users/")
@@ -95,6 +118,11 @@ async def set_api_key(api_key: str = Form(...), admin=Depends(get_admin_user)):
     config["ELEVENLABS_API_KEY"] = api_key
     save_config(config)
     return {"message": "API key updated successfully"}
+
+@app.get("/admin/active-users/")
+async def active_users_endpoint(admin=Depends(get_admin_user)):
+    users = get_active_users()
+    return {"count": len(users), "users": users}
 
 # ------------------ HELPERS ------------------
 def split_text(text: str, max_length: int = 4500):
@@ -203,8 +231,18 @@ def merge_audios_ffmpeg(files, output_file, custom_id):
 async def generate_audio(
     file: UploadFile = File(...),
     custom_id: str = Form("output"),
-    voice_id: str = Form("6sFKzaJr574YWVu4UuJF")
+    voice_id: str = Form("6sFKzaJr574YWVu4UuJF"),
+    email: str = Form(None)  # 👈 frontend passes logged-in user email
 ):
+    # ---------------- save last-used voice ID ----------------
+    if email:
+        users = load_users()
+        for u in users:
+            if u["email"] == email:
+                u["voice_id"] = voice_id  # update or add field
+        save_users(users)
+
+    # ---------------- continue as before ----------------
     text = (await file.read()).decode("utf-8").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Text file is empty")
