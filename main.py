@@ -49,7 +49,7 @@ config = load_config()
 app = FastAPI()
 
 origins = [
-    "https://regal-sherbet-f82e45.netlify.app",  # your frontend domain
+    "https://elegant-valkyrie-d561e1.netlify.app",  # your frontend domain
     "http://localhost:3000",                      # for local dev
 ]
 
