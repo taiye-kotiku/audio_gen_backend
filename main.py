@@ -47,10 +47,15 @@ config = load_config()
 
 app = FastAPI()
 
+origins = [
+    "https://regal-sherbet-f82e45.netlify.app",  # your frontend domain
+    "http://localhost:3000",                      # for local dev
+]
+
 # Allow React frontend to call API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
