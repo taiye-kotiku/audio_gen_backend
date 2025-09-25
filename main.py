@@ -319,3 +319,10 @@ def get_progress(custom_id: str):
     data = progress_dict[custom_id]
     percent = int((data["done"] / data["total"]) * 100) if data["total"] else 100
     return {"done": data["done"], "total": data["total"], "percent": percent}
+
+@app.post("/heartbeat/")
+async def heartbeat(email: str = Form(...)):
+    mark_user_active(email)
+    return {"status": "ok"}
+
+
