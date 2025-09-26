@@ -127,8 +127,8 @@ def get_active_sessions(minutes: int = 5):
     cutoff = now - (minutes * 60)
     
     # 💡 ADD DEBUGGING HERE
-    print(f"\n[DEBUG: ACTIVE SESSIONS CHECK]")
-    print(f"  Current Time (now): {now}")
+    print(f"\n[DEBUG: RAW SESSIONS - Total: {len(active_sessions)}]")
+    print(active_sessions) # 💡 Check if this is unexpectedly empty
     print(f"  Cutoff Time ({minutes} min ago): {cutoff}")
     
     active = {}
@@ -183,6 +183,8 @@ async def set_api_key(api_key: str = Form(...), admin=Depends(get_admin_user)):
 @app.get("/admin/active-users/")
 async def active_users_endpoint(admin=Depends(get_admin_user)):
     sessions = get_active_sessions()
+    # 💡 Print the final count
+    print(f"[DEBUG: FINAL ACTIVE COUNT] {len(sessions)}") 
     # Count unique sessions, not just emails
     return {
         "count": len(sessions),
