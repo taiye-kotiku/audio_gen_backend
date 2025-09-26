@@ -39,7 +39,7 @@ app = FastAPI()
 
 origins = [
     "https://elegant-valkyrie-d561e1.netlify.app",  # your frontend domain
-    "http://localhost:3000",                      # for local dev
+    "http://localhost:3000",                        # for local dev
 ]
 
 # Allow React frontend to call API
@@ -100,11 +100,6 @@ def add_history_entry(email: str, entry: dict):
     history[email].append(entry)
     save_history(history)
 
-@app.get("/history/{email}")
-async def get_history(email: str):
-    history = load_history()
-    return history.get(email, [])
-
 # Track active sessions (by token instead of just email)
 active_sessions = {}
 
@@ -115,23 +110,20 @@ def get_active_sessions(minutes: int = 5):
     now = time.time()
     cutoff = now - (minutes * 60)
     
-    # 💡 ADD DEBUGGING HERE
-    print(f"\n[DEBUG: RAW SESSIONS - Total: {len(active_sessions)}]")
-    print(active_sessions) # 💡 Check if this is unexpectedly empty
-    print(f"  Cutoff Time ({minutes} min ago): {cutoff}")
-    
+    # Clean up and return only genuinely active sessions
     active = {}
+    tokens_to_delete = []
+    
     for token, session_data in active_sessions.items():
-        last_seen = session_data["last_seen"]
-        
-        # 💡 DEBUG: Print comparison for one or two sessions
-        if len(active) < 2:
-             print(f"  Session Token: {token[:8]}..., Last Seen: {last_seen}, Is Active: {last_seen >= cutoff}")
-             
-        if last_seen >= cutoff:
+        if session_data["last_seen"] >= cutoff:
             active[token] = session_data
+        else:
+            tokens_to_delete.append(token)
             
-    print(f"[DEBUG: ACTIVE SESSIONS FOUND] Count: {len(active)}")
+    # Clean up inactive sessions from the global dictionary
+    for token in tokens_to_delete:
+        active_sessions.pop(token, None)
+            
     return active
 
 
@@ -172,11 +164,15 @@ async def set_api_key(api_key: str = Form(...), admin=Depends(get_admin_user)):
 @app.get("/admin/active-users/")
 async def active_users_endpoint(admin=Depends(get_admin_user)):
     sessions = get_active_sessions()
-    # 💡 Print the final count
-    print(f"[DEBUG: FINAL ACTIVE COUNT] {len(sessions)}") 
-    # Count unique sessions, not just emails
+    
+    # CRITICAL FIX: Count unique emails (users), not sessions (tokens)
+    active_emails = {s["email"] for s in sessions.values()}
+    unique_user_count = len(active_emails)
+
+    print(f"[DEBUG: FINAL UNIQUE USER COUNT] {unique_user_count}") 
+    
     return {
-        "count": len(sessions),
+        "count": unique_user_count,
         "sessions": [{"token": t, "email": s["email"]} for t, s in sessions.items()]
     }
 
@@ -350,6 +346,3 @@ async def heartbeat(token: str = Form(...), email: str = Form(...)):
     mark_session_active(token, email)
     print(f"HEARTBEAT RECEIVED: Token={token[:8]}..., Email={email}, Last Seen={active_sessions[token]['last_seen']}")
     return {"status": "ok"}
-
-
-
