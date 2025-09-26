@@ -122,14 +122,28 @@ active_sessions = {}
 def mark_session_active(token: str, email: str):
     active_sessions[token] = {"email": email, "last_seen": time.time()}
 
-def get_active_sessions(minutes: int = 2):
+def get_active_sessions(minutes: int = 5):
     now = time.time()
     cutoff = now - (minutes * 60)
-    print(f"\n--- ACTIVE SESSION CHECK ---") # 💡 ADD THIS LINE FOR DEBUGGING
-    print(f"Current Sessions (Total {len(active_sessions)}): {active_sessions}") # 💡 ADD THIS LINE FOR DEBUGGING
-    print(f"Cutoff Time: {cutoff} (now: {now})") # 💡 ADD THIS LINE FOR DEBUGGING
-    return {t: s for t, s in active_sessions.items() if s["last_seen"] >= cutoff}
-
+    
+    # 💡 ADD DEBUGGING HERE
+    print(f"\n[DEBUG: ACTIVE SESSIONS CHECK]")
+    print(f"  Current Time (now): {now}")
+    print(f"  Cutoff Time ({minutes} min ago): {cutoff}")
+    
+    active = {}
+    for token, session_data in active_sessions.items():
+        last_seen = session_data["last_seen"]
+        
+        # 💡 DEBUG: Print comparison for one or two sessions
+        if len(active) < 2:
+             print(f"  Session Token: {token[:8]}..., Last Seen: {last_seen}, Is Active: {last_seen >= cutoff}")
+             
+        if last_seen >= cutoff:
+            active[token] = session_data
+            
+    print(f"[DEBUG: ACTIVE SESSIONS FOUND] Count: {len(active)}")
+    return active
 
 
 # ------------------ ADMIN ------------------
