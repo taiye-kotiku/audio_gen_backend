@@ -22,17 +22,6 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 CONFIG_FILE = "config.json"
 
 
-# Track active users
-active_users = {}
-
-def mark_user_active(email: str):
-    active_users[email] = time.time()
-
-def get_active_users(minutes: int = 5):
-    now = time.time()
-    cutoff = now - (minutes * 60)
-    return [u for u, ts in active_users.items() if ts >= cutoff]
-
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         return {"ELEVENLABS_API_KEY": ""}
