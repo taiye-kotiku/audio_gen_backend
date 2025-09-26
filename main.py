@@ -122,7 +122,7 @@ active_sessions = {}
 def mark_session_active(token: str, email: str):
     active_sessions[token] = {"email": email, "last_seen": time.time()}
 
-def get_active_sessions(minutes: int = 5):
+def get_active_sessions(minutes: int = 2):
     now = time.time()
     cutoff = now - (minutes * 60)
     return {t: s for t, s in active_sessions.items() if s["last_seen"] >= cutoff}
