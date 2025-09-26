@@ -81,7 +81,7 @@ async def login(email: str = Form(...), password: str = Form(...)):
     token = create_access_token({"sub": user["email"]})
 
     # mark user active
-    mark_user_active(user["email"])
+    mark_session_active(token, user["email"])
 
     return {
         "access_token": token,
@@ -115,6 +115,18 @@ def add_history_entry(email: str, entry: dict):
 async def get_history(email: str):
     history = load_history()
     return history.get(email, [])
+
+# Track active sessions (by token instead of just email)
+active_sessions = {}
+
+def mark_session_active(token: str, email: str):
+    active_sessions[token] = {"email": email, "last_seen": time.time()}
+
+def get_active_sessions(minutes: int = 5):
+    now = time.time()
+    cutoff = now - (minutes * 60)
+    return {t: s for t, s in active_sessions.items() if s["last_seen"] >= cutoff}
+
 
 
 # ------------------ ADMIN ------------------
@@ -153,8 +165,13 @@ async def set_api_key(api_key: str = Form(...), admin=Depends(get_admin_user)):
 
 @app.get("/admin/active-users/")
 async def active_users_endpoint(admin=Depends(get_admin_user)):
-    users = get_active_users()
-    return {"count": len(users), "users": users}
+    sessions = get_active_sessions()
+    # Count unique sessions, not just emails
+    return {
+        "count": len(sessions),
+        "sessions": [{"token": t, "email": s["email"]} for t, s in sessions.items()]
+    }
+
 
 # ------------------ HELPERS ------------------
 def split_text(text: str, max_length: int = 4500):
@@ -321,8 +338,9 @@ def get_progress(custom_id: str):
     return {"done": data["done"], "total": data["total"], "percent": percent}
 
 @app.post("/heartbeat/")
-async def heartbeat(email: str = Form(...)):
-    mark_user_active(email)
+async def heartbeat(token: str = Form(...), email: str = Form(...)):
+    mark_session_active(token, email)
     return {"status": "ok"}
+
 
 
