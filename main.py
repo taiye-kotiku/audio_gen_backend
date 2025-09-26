@@ -125,6 +125,9 @@ def mark_session_active(token: str, email: str):
 def get_active_sessions(minutes: int = 2):
     now = time.time()
     cutoff = now - (minutes * 60)
+    print(f"\n--- ACTIVE SESSION CHECK ---") # 💡 ADD THIS LINE FOR DEBUGGING
+    print(f"Current Sessions (Total {len(active_sessions)}): {active_sessions}") # 💡 ADD THIS LINE FOR DEBUGGING
+    print(f"Cutoff Time: {cutoff} (now: {now})") # 💡 ADD THIS LINE FOR DEBUGGING
     return {t: s for t, s in active_sessions.items() if s["last_seen"] >= cutoff}
 
 
@@ -340,6 +343,7 @@ def get_progress(custom_id: str):
 @app.post("/heartbeat/")
 async def heartbeat(token: str = Form(...), email: str = Form(...)):
     mark_session_active(token, email)
+    print(f"HEARTBEAT RECEIVED: Token={token[:8]}..., Email={email}, Last Seen={active_sessions[token]['last_seen']}")
     return {"status": "ok"}
 
 
