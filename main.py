@@ -161,21 +161,27 @@ async def set_api_key(api_key: str = Form(...), admin=Depends(get_admin_user)):
     save_config(config)
     return {"message": "API key updated successfully"}
 
-@app.get("/admin/active-users/")
-async def active_users_endpoint(admin=Depends(get_admin_user)):
-    sessions = get_active_sessions()
+def get_active_sessions(minutes: int = 5):
+    now = time.time()
+    cutoff = now - (minutes * 60)
     
-    # CRITICAL FIX: Count unique emails (users), not sessions (tokens)
-    active_emails = {s["email"] for s in sessions.values()}
-    unique_user_count = len(active_emails)
-
-    print(f"[DEBUG: FINAL UNIQUE USER COUNT] {unique_user_count}") 
+    # Clean up inactive sessions first
+    tokens_to_delete = []
+    for token, session_data in active_sessions.items():
+        if session_data["last_seen"] < cutoff:
+            tokens_to_delete.append(token)
     
-    return {
-        "count": unique_user_count,
-        "sessions": [{"token": t, "email": s["email"]} for t, s in sessions.items()]
-    }
-
+    for token in tokens_to_delete:
+        active_sessions.pop(token, None)
+    
+    # Now count unique emails from remaining active sessions
+    active_emails = set()
+    for session_data in active_sessions.values():
+        active_emails.add(session_data["email"])
+    
+    print(f"[DEBUG] Active sessions: {len(active_sessions)}, Unique users: {len(active_emails)}")
+    
+    return active_sessions
 
 # ------------------ HELPERS ------------------
 def split_text(text: str, max_length: int = 4500):
