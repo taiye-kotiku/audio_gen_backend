@@ -352,3 +352,15 @@ async def heartbeat(token: str = Form(...), email: str = Form(...)):
     mark_session_active(token, email)
     print(f"HEARTBEAT RECEIVED: Token={token[:8]}..., Email={email}, Last Seen={active_sessions[token]['last_seen']}")
     return {"status": "ok"}
+
+
+# ------------------ HISTORY ENDPOINT ------------------
+@app.get("/user/history/")
+async def get_user_history(email: str):
+    """Get history for a specific user"""
+    history = load_history()
+    user_history = history.get(email, [])
+    
+    # Return in reverse chronological order (newest first)
+    user_history.reverse()
+    return user_history
