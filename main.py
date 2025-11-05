@@ -167,17 +167,11 @@ async def set_api_key(api_key: str = Form(...), admin=Depends(get_admin_user)):
 async def active_users_endpoint(admin=Depends(get_admin_user)):
     sessions = get_active_sessions()
     
-    # Count unique emails from remaining active sessions
-    active_emails = set()
-    for session_data in sessions.values():
-        active_emails.add(session_data["email"])
-    
-    unique_user_count = len(active_emails)
-
-    print(f"[DEBUG] Active users: {unique_user_count}") 
+    # Count total active sessions (tabs/browsers)
+    total_sessions = len(sessions)
     
     return {
-        "count": unique_user_count,
+        "count": total_sessions,  # ✅ Total sessions, not unique emails
         "sessions": [{"token": t, "email": s["email"]} for t, s in sessions.items()]
     }
 
