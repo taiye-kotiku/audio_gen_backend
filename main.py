@@ -170,6 +170,15 @@ async def active_users_endpoint(admin=Depends(get_admin_user)):
     # Count total active sessions (tabs/browsers)
     total_sessions = len(sessions)
     
+    print(f"\n{'='*50}")
+    print(f"[DEBUG] Total active sessions: {total_sessions}")
+    print(f"[DEBUG] Current time: {time.time()}")
+    print(f"[DEBUG] Session details:")
+    for token, data in sessions.items():
+        age_seconds = time.time() - data["last_seen"]
+        print(f"  - Email: {data['email']}, Token: {token[:8]}..., Age: {age_seconds:.0f}s")
+    print(f"{'='*50}\n")
+
     return {
         "count": total_sessions,  # ✅ Total sessions, not unique emails
         "sessions": [{"token": t, "email": s["email"]} for t, s in sessions.items()]
@@ -356,3 +365,13 @@ async def get_user_history(email: str):
     # Return in reverse chronological order (newest first)
     user_history.reverse()
     return user_history
+
+
+@app.post("/logout/")
+async def logout(token: str = Form(...)):
+    """Remove session when user logs out"""
+    if token in active_sessions:
+        email = active_sessions[token]["email"]
+        active_sessions.pop(token, None)
+        print(f"[LOGOUT] Removed session for {email}, Token: {token[:8]}...")
+    return {"status": "logged out"}
