@@ -1,4 +1,9 @@
 [
+    {
+    "email": "admin@example.com",
+    "password_hash": "$2b$12$BZA7DMhJX/DORYwRpriKnuAWedH/liNy9qahzICSeBcaS8H6foFki",
+    "is_admin": true
+  },
   {
     "email": "kotikutaiye@gmail.com",
     "password_hash": "$2b$12$pkcu2yCUNYOKW7pyuy5LqeuonQ1xp/Fx77O7OP7DFUS8sFPAs86vG",
