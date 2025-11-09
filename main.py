@@ -71,7 +71,7 @@ async def login(email: str = Form(...), password: str = Form(...)):
     token = create_access_token({"sub": user["email"]})
 
     # mark user active
-    mark_session_active(token, user["email"])
+    #mark_session_active(token, user["email"])
 
     return {
         "access_token": token,
