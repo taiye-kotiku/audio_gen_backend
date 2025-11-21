@@ -56,7 +56,7 @@ import jwt
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "supersecretkey")  # replace with secure key
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 1 day
 
 
 def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MINUTES):
